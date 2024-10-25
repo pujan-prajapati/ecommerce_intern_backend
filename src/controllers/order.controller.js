@@ -4,6 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import asyncHandler from "express-async-handler";
 import { Order } from "../models/order.model.js";
 import mongoose from "mongoose";
+import { sendEmail } from "../utils/sendMail.js";
 
 // order an item
 export const orderItem = asyncHandler(async (req, res) => {
@@ -155,13 +156,26 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
-  const findOrder = await Order.findById(id);
+  const findOrder = await Order.findById(id).populate("user", "email");
   if (!findOrder) {
     throw new Error("Order not found");
   }
 
   findOrder.status = status;
   await findOrder.save();
+
+  if (findOrder.status === "shipped" || findOrder.status === "delivered") {
+    const subject = `Your Order #${findOrder._id} is now ${status}`;
+    const text = `Hello ${findOrder.firstName},\n\nYour order is now ${status}. Thank you for shopping with us!`;
+    const html = `
+        <h1>Order Update</h1>
+        <p>Hello ${findOrder.firstName + " " + findOrder.lastName},</p>
+        <p>Your order is now <strong>${status}</strong>.</p>
+        <p>Thank you for shopping with us!</p>
+      `;
+
+    await sendEmail(findOrder.user.email, subject, text, html);
+  }
 
   res
     .status(200)
@@ -205,13 +219,16 @@ export const cancelOrder = asyncHandler(async (req, res) => {
 //get order by id
 export const getOrderById = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { _id } = req.user;
+  const { _id, role } = req.user;
+
+  let matchCretria = { _id: new mongoose.Types.ObjectId(id) };
+  if (role !== "admin") {
+    matchCretria = { user: new mongoose.Types.ObjectId(_id) };
+  }
+
   let findOrder = await Order.aggregate([
     {
-      $match: {
-        _id: new mongoose.Types.ObjectId(id),
-        user: new mongoose.Types.ObjectId(_id),
-      },
+      $match: matchCretria,
     },
     {
       $lookup: {
