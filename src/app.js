@@ -26,12 +26,14 @@ import productRouter from "./routes/product.routes.js";
 import categoryRouter from "./routes/category.routes.js";
 import cartRouter from "./routes/cart.routes.js";
 import orderRouter from "./routes/order.routes.js";
+import wishlistRouter from "./routes/wishlist.routes.js";
 
 app.use("/api/users", userRouter);
 app.use("/api/products", productRouter);
 app.use("/api/category", categoryRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/orders", orderRouter);
+app.use("/api/wishlist", wishlistRouter);
 
 //error handler
 import { errorHandler } from "./middlewares/errorHandler.js";
