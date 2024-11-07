@@ -44,10 +44,6 @@ export const getAllWishlist = asyncHandler(async (req, res) => {
     throw new Error("User not found");
   }
 
-  if (findUser.wishlist.length === 0) {
-    throw new Error("Wishlist is empty");
-  }
-
   return res
     .status(200)
     .json(
