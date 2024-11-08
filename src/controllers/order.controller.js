@@ -88,9 +88,6 @@ export const getAllOrders = asyncHandler(async (req, res) => {
       },
     },
     {
-      $unwind: "$user",
-    },
-    {
       $unwind: "$productDetails",
     },
     {
@@ -103,6 +100,11 @@ export const getAllOrders = asyncHandler(async (req, res) => {
         productDetails: 0,
       },
     },
+    {
+      $sort: {
+        createdAt: -1,
+      },
+    },
   ]);
 
   res.status(200).json(new ApiResponse(200, orders, "orders fetched success"));
@@ -111,17 +113,34 @@ export const getAllOrders = asyncHandler(async (req, res) => {
 //get user orders
 export const getUserOrders = asyncHandler(async (req, res) => {
   const { _id } = req.user;
+  let { page = 1, limit = 10, status } = req.query;
+
+  page = isNaN(page) ? 1 : Number(page);
+  limit = isNaN(limit) ? 10 : Number(limit);
+
+  if (page <= 0) {
+    page = 1;
+  }
+  if (limit <= 0) {
+    limit = 10;
+  }
 
   const findUser = await User.findById(_id);
   if (!findUser) {
     throw new Error("user not found");
   }
 
+  const matchConditions = {
+    user: new mongoose.Types.ObjectId(findUser._id),
+  };
+
+  if (status) {
+    matchConditions.status = status;
+  }
+
   const orders = await Order.aggregate([
     {
-      $match: {
-        user: new mongoose.Types.ObjectId(findUser),
-      },
+      $match: matchConditions,
     },
     {
       $lookup: {
@@ -142,13 +161,37 @@ export const getUserOrders = asyncHandler(async (req, res) => {
     {
       $unwind: "$product.productDetails",
     },
+    {
+      $sort: {
+        createdAt: -1,
+      },
+    },
+    {
+      $skip: (page - 1) * limit,
+    },
+    {
+      $limit: Number(limit),
+    },
   ]);
 
-  if (!orders || orders.length === 0) {
-    throw new Error("No orders found");
-  }
+  const totalOrders = await Order.countDocuments(matchConditions);
 
-  res.status(200).json(new ApiResponse(200, orders, "orders fetched success"));
+  // if (!orders || orders.length === 0) {
+  //   throw new Error("No orders found");
+  // }
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        orders,
+        totalPages: Math.ceil(totalOrders / limit),
+        currentPage: page,
+        totalCount: totalOrders,
+      },
+      "orders fetched success"
+    )
+  );
 });
 
 //update order status

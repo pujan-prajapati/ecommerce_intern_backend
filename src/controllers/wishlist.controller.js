@@ -37,9 +37,13 @@ export const addToWishList = asyncHandler(async (req, res) => {
 export const getAllWishlist = asyncHandler(async (req, res) => {
   const { _id } = req.user;
 
-  const findUser = await User.findById(_id)
-    .sort({ createdAt: -1 })
-    .populate("wishlist", "image name price");
+  const findUser = await User.findById(_id).populate({
+    path: "wishlist",
+    select: "name image price createdAt",
+    options: {
+      sort: { createdAt: 1 },
+    },
+  });
   if (!findUser) {
     throw new Error("User not found");
   }
