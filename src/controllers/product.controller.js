@@ -55,17 +55,92 @@ export const createProduct = asyncHandler(async (req, res) => {
 
 //get all product
 export const getAllProducts = asyncHandler(async (req, res) => {
-  const getAllProducts = await Product.find()
-    .populate("category")
-    .sort("-createdAt");
+  let {
+    sortBy,
+    sortDirection,
+    search,
+    minPrice,
+    maxPrice,
+    page = 1,
+    limit = 10,
+  } = req.query;
 
-  if (!getAllProducts) {
-    throw new Error("No product available");
+  page = isNaN(page) ? 1 : Number(page);
+  limit = isNaN(limit) ? 10 : Number(limit);
+
+  if (page <= 0) {
+    page = 1;
+  }
+  if (limit <= 0) {
+    limit = 10;
   }
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, getAllProducts, "All products fetched"));
+  sortBy = sortBy || "createdAt";
+  sortDirection = sortDirection === "desc" ? -1 : 1;
+
+  const matchConditions = {};
+
+  if (minPrice || maxPrice) {
+    matchConditions.price = {};
+    if (minPrice) {
+      matchConditions.price.$gte = Number(minPrice);
+    }
+    if (maxPrice) {
+      matchConditions.price.$lte = Number(maxPrice);
+    }
+  }
+
+  if (search) {
+    matchConditions.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+      { "category.name": { $regex: search, $options: "i" } },
+      { "category.description": { $regex: search, $options: "i" } },
+    ];
+  }
+
+  const products = await Product.aggregate([
+    {
+      $lookup: {
+        from: "categories",
+        localField: "category",
+        foreignField: "_id",
+        as: "category",
+      },
+    },
+    {
+      $unwind: "$category",
+    },
+    {
+      $match: matchConditions,
+    },
+    {
+      $sort: {
+        [sortBy]: sortDirection,
+      },
+    },
+    {
+      $skip: (page - 1) * limit,
+    },
+    {
+      $limit: Number(limit),
+    },
+  ]);
+
+  const totalProducts = products.length;
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        products,
+        totalProducts,
+        totalPages: Math.ceil(totalProducts / limit),
+        currentPage: page,
+      },
+      "All products fetched"
+    )
+  );
 });
 
 //get product by id

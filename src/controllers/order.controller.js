@@ -176,10 +176,6 @@ export const getUserOrders = asyncHandler(async (req, res) => {
 
   const totalOrders = await Order.countDocuments(matchConditions);
 
-  // if (!orders || orders.length === 0) {
-  //   throw new Error("No orders found");
-  // }
-
   res.status(200).json(
     new ApiResponse(
       200,
