@@ -38,6 +38,12 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: [true, "Product description is required"],
     },
+    comments: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Comment",
+      },
+    ],
   },
   {
     timestamps: true,

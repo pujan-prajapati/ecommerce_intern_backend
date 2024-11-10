@@ -109,8 +109,17 @@ export const getAllProducts = asyncHandler(async (req, res) => {
       },
     },
     {
+      $lookup: {
+        from: "comments",
+        localField: "comments",
+        foreignField: "_id",
+        as: "comments",
+      },
+    },
+    {
       $unwind: "$category",
     },
+
     {
       $match: matchConditions,
     },
