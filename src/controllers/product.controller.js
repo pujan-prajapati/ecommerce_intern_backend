@@ -78,6 +78,10 @@ export const getAllProducts = asyncHandler(async (req, res) => {
   sortBy = sortBy || "createdAt";
   sortDirection = sortDirection === "desc" ? -1 : 1;
 
+  if (sortBy === "createdAt" && sortDirection === 1) {
+    sortDirection = -1;
+  }
+
   const matchConditions = {};
 
   if (minPrice || maxPrice) {
@@ -136,7 +140,7 @@ export const getAllProducts = asyncHandler(async (req, res) => {
     },
   ]);
 
-  const totalProducts = products.length;
+  const totalProducts = await Product.countDocuments(matchConditions);
 
   return res.status(200).json(
     new ApiResponse(

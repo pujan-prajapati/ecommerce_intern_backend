@@ -7,10 +7,14 @@ const commentSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-
     comment: {
       type: String,
     },
+    reply: [
+      {
+        type: String,
+      },
+    ],
   },
   {
     timestamps: true,
@@ -18,4 +22,4 @@ const commentSchema = new mongoose.Schema(
 );
 
 //Export the model
-export const Comment = mongoose.model("comment", commentSchema);
+export const Comment = mongoose.model("Comment", commentSchema);

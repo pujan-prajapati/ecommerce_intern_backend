@@ -33,6 +33,31 @@ export const addComment = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, newComment, "Comment added successfully"));
 });
 
+//get comments
+export const getComments = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+
+  const findProduct = await Product.findById(productId).populate({
+    path: "comments",
+    options: {
+      sort: { createdAt: -1 },
+    },
+  });
+  if (!findProduct) {
+    throw new Error("Product not found");
+  }
+
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        findProduct.comments,
+        "Comments fetched successfully"
+      )
+    );
+});
+
 // delete comment
 export const deleteComment = asyncHandler(async (req, res) => {
   const { _id } = req.user;
@@ -92,4 +117,47 @@ export const editComment = asyncHandler(async (req, res) => {
   res
     .status(200)
     .json(new ApiResponse(200, findComment, "Comment edited successfully"));
+});
+
+//reply
+export const replyComment = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
+  const { commentId } = req.body;
+
+  const findUser = await User.findById(_id);
+  if (!findUser) {
+    throw new Error("User not found");
+  }
+
+  if (findUser.role !== "admin") {
+    throw new Error("You are not authorized to reply to this comment");
+  }
+
+  const findComment = await Comment.findById(commentId);
+  if (!findComment) {
+    throw new Error("Comment not found");
+  }
+
+  findComment.reply.push(req.body.reply);
+  await findComment.save();
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, findComment, "Reply added successfully"));
+});
+
+//get reply
+export const getReplies = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+
+  const findComment = await Comment.findById(commentId);
+  if (!findComment) {
+    throw new Error("Comment not found");
+  }
+
+  res
+    .status(200)
+    .json(
+      new ApiResponse(200, findComment.reply, "Replies fetched successfully")
+    );
 });
