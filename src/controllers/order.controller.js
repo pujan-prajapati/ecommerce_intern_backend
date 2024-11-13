@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import { User } from "../models/user.model.js";
 import { Product } from "../models/product.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -213,7 +216,13 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
         <p>Thank you for shopping with us!</p>
       `;
 
-    await sendEmail(findOrder.user.email, subject, text, html);
+    await sendEmail(
+      process.env.EMAIL_USER,
+      findOrder.user.email,
+      subject,
+      text,
+      html
+    );
   }
 
   res

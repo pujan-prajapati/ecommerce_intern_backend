@@ -2,7 +2,7 @@ import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 dotenv.config();
 
-export const sendEmail = async (to, subject, text, html) => {
+export const sendEmail = async (from, to, subject, text, html) => {
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
@@ -14,7 +14,7 @@ export const sendEmail = async (to, subject, text, html) => {
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from,
       to,
       subject,
       text,

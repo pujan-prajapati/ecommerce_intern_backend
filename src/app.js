@@ -28,6 +28,7 @@ import cartRouter from "./routes/cart.routes.js";
 import orderRouter from "./routes/order.routes.js";
 import wishlistRouter from "./routes/wishlist.routes.js";
 import commentRouter from "./routes/comment.routes.js";
+import contactRouter from "./routes/contact.routes.js";
 
 app.use("/api/users", userRouter);
 app.use("/api/products", productRouter);
@@ -36,6 +37,7 @@ app.use("/api/cart", cartRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/comment", commentRouter);
+app.use("/api/contact", contactRouter);
 
 //error handler
 import { errorHandler } from "./middlewares/errorHandler.js";
