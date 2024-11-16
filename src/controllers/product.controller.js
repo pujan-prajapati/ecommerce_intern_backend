@@ -121,6 +121,23 @@ export const getAllProducts = asyncHandler(async (req, res) => {
       },
     },
     {
+      $lookup: {
+        from: "reviews",
+        localField: "reviews",
+        foreignField: "_id",
+        as: "reviews",
+        pipeline: [
+          {
+            $project: {
+              user: 1,
+              rating: 1,
+              comment: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
       $unwind: "$category",
     },
 
@@ -178,6 +195,23 @@ export const getProductById = asyncHandler(async (req, res) => {
             $project: {
               name: 1,
               image: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: "reviews",
+        localField: "reviews",
+        foreignField: "_id",
+        as: "reviews",
+        pipeline: [
+          {
+            $project: {
+              user: 1,
+              rating: 1,
+              comment: 1,
             },
           },
         ],

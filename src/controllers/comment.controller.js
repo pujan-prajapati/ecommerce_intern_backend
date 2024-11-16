@@ -80,6 +80,14 @@ export const deleteComment = asyncHandler(async (req, res) => {
   ) {
     const deletedComment = await Comment.findByIdAndDelete(commentId);
 
+    const product = await Product.findOne({ comments: commentId });
+    if (product) {
+      product.comments = product.comments.filter(
+        (id) => id.toString() !== commentId
+      );
+      await product.save();
+    }
+
     return res
       .status(200)
       .json(

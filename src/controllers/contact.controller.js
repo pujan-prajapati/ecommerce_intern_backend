@@ -13,10 +13,6 @@ export const sendMessage = asyncHandler(async (req, res) => {
     throw new Error("User not found");
   }
 
-  // Save the contact form data in the database
-  const newContact = new Contact({ fullName, email, phone, message });
-  await newContact.save();
-
   // Prepare the email details
   const subject = `New Contact Form Submission from ${findUser.firstName + " " + findUser.lastName}`;
   const text = `You have a new contact form submission:\n\nName: ${fullName}\nEmail: ${email}\nPhone: ${phone}\nMessage: ${message}`;
@@ -32,7 +28,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   // Send the email to the designated notification email
   await sendEmail(
     findUser.email, // Sender's email address
-    process.env.EMAIL_USER, // Recipient's email address
+    process.env.EMAIL_ADMIN, // Recipient's email address
     subject,
     text,
     html

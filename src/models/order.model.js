@@ -6,21 +6,23 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    product: {
-      productDetails: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
-        required: [true, "Product is required"],
+    product: [
+      {
+        productId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: [true, "Product is required"],
+        },
+        quantity: {
+          type: Number,
+          default: 1,
+          required: [true, "Product quantity is required"],
+        },
+        totalPrice: {
+          type: Number,
+        },
       },
-      quantity: {
-        type: Number,
-        default: 1,
-        required: [true, "Product quantity is required"],
-      },
-      price: {
-        type: Number,
-      },
-    },
+    ],
     firstName: {
       type: String,
       required: [true, "First name is required"],
@@ -61,6 +63,10 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "completed"],
       default: "pending",
+    },
+    totalPrice: {
+      type: Number,
+      required: [true, "Total price is required"],
     },
   },
   {

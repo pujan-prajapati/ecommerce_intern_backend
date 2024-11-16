@@ -13,9 +13,7 @@ import { sendEmail } from "../utils/sendMail.js";
 export const orderItem = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   let {
-    productDetails,
-    quantity,
-    price,
+    product,
     firstName,
     lastName,
     phoneNumber,
@@ -32,27 +30,31 @@ export const orderItem = asyncHandler(async (req, res) => {
     throw new Error("User not found");
   }
 
-  const findProduct = await Product.findById(productDetails);
-  if (!findProduct) {
-    throw new Error("Product not found");
+  let items = Array.isArray(product) ? product : [product];
+  let totalPrice = 0;
+
+  for (let item of items) {
+    const { productId, quantity } = item;
+
+    const findProduct = await Product.findById(productId);
+    if (!findProduct) {
+      throw new Error("Product not found");
+    }
+
+    if (findProduct.quantity < quantity) {
+      throw new Error("Product quantity not available");
+    }
+
+    findProduct.quantity -= quantity;
+    await findProduct.save();
+
+    item.totalPrice = findProduct.price * quantity;
+    totalPrice += findProduct.price * quantity;
   }
-
-  if (findProduct.quantity < quantity) {
-    throw new Error("Product quantity not available");
-  }
-
-  findProduct.quantity = findProduct.quantity - quantity;
-  await findProduct.save();
-
-  price = findProduct.price * quantity;
 
   const order = await Order.create({
     user: _id,
-    product: {
-      productDetails,
-      quantity,
-      price,
-    },
+    product: items,
     firstName,
     lastName,
     phoneNumber,
@@ -64,6 +66,7 @@ export const orderItem = asyncHandler(async (req, res) => {
     status,
     paymentMethod,
     paymentStatus,
+    totalPrice,
   });
 
   res
@@ -75,9 +78,12 @@ export const orderItem = asyncHandler(async (req, res) => {
 export const getAllOrders = asyncHandler(async (req, res) => {
   const orders = await Order.aggregate([
     {
+      $unwind: "$product",
+    },
+    {
       $lookup: {
         from: "products",
-        localField: "product.productDetails",
+        localField: "product.productId",
         foreignField: "_id",
         as: "productDetails",
         pipeline: [
@@ -104,8 +110,25 @@ export const getAllOrders = asyncHandler(async (req, res) => {
       },
     },
     {
+      $group: {
+        _id: "$_id",
+        user: { $first: "$user" },
+        product: { $push: "$product" },
+        firstName: { $first: "$firstName" },
+        lastName: { $first: "$lastName" },
+        phoneNumber: { $first: "$phoneNumber" },
+        location: { $first: "$location" },
+        status: { $first: "$status" },
+        paymentMethod: { $first: "$paymentMethod" },
+        paymentStatus: { $first: "$paymentStatus" },
+        totalPrice: { $first: "$totalPrice" },
+        createdAt: { $first: "$createdAt" },
+        updatedAt: { $first: "$updatedAt" },
+      },
+    },
+    {
       $sort: {
-        createdAt: -1,
+        createdAt: -1, // Sort by creation date in descending order
       },
     },
   ]);
@@ -146,23 +169,53 @@ export const getUserOrders = asyncHandler(async (req, res) => {
       $match: matchConditions,
     },
     {
+      $unwind: "$product", // Flatten the 'product' array so we can lookup each item individually
+    },
+    {
       $lookup: {
-        from: "products",
-        localField: "product.productDetails",
-        foreignField: "_id",
-        as: "product.productDetails",
+        from: "products", // Join with the 'products' collection
+        localField: "product.productId", // Field in the 'order' document referring to the product ID
+        foreignField: "_id", // Field in the 'products' collection to match
+        as: "productDetails", // Add product details to this field
         pipeline: [
           {
             $project: {
+              name: 1, // Include only the fields you need
               image: 1,
-              name: 1,
             },
           },
         ],
       },
     },
     {
-      $unwind: "$product.productDetails",
+      $unwind: "$productDetails",
+    },
+    {
+      $addFields: {
+        "product.productDetails": "$productDetails", // Add product details to the product object
+      },
+    },
+    {
+      $project: {
+        productDetails: 0, // Optionally remove the original productDetails field
+      },
+    },
+    {
+      $group: {
+        _id: "$_id", // Group back by order ID to reconstruct the original order object
+        user: { $first: "$user" },
+        product: { $push: "$product" }, // Rebuild the product array with updated product details
+        firstName: { $first: "$firstName" },
+        lastName: { $first: "$lastName" },
+        phoneNumber: { $first: "$phoneNumber" },
+        location: { $first: "$location" },
+        status: { $first: "$status" },
+        paymentMethod: { $first: "$paymentMethod" },
+        paymentStatus: { $first: "$paymentStatus" },
+        totalPrice: { $first: "$totalPrice" },
+        createdAt: { $first: "$createdAt" },
+        updatedAt: { $first: "$updatedAt" },
+      },
     },
     {
       $sort: {
@@ -195,8 +248,14 @@ export const getUserOrders = asyncHandler(async (req, res) => {
 
 //update order status
 export const updateOrderStatus = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
   const { id } = req.params;
   const { status } = req.body;
+
+  const findUser = await User.findById(_id);
+  if (!findUser) {
+    throw new Error("User not found");
+  }
 
   const findOrder = await Order.findById(id).populate("user", "email");
   if (!findOrder) {
@@ -216,13 +275,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
         <p>Thank you for shopping with us!</p>
       `;
 
-    await sendEmail(
-      process.env.EMAIL_USER,
-      findOrder.user.email,
-      subject,
-      text,
-      html
-    );
+    await sendEmail(findUser.email, findOrder.user.email, subject, text, html);
   }
 
   res
@@ -248,13 +301,15 @@ export const cancelOrder = asyncHandler(async (req, res) => {
     throw new Error("Can't cancel a shipped or delivered order");
   }
 
-  const findProduct = await Product.findById(findOrder.product.productDetails);
-  if (!findProduct) {
-    throw new Error("Product not found");
-  }
+  for (let orderProduct of findOrder.product) {
+    const findProduct = await Product.findById(orderProduct.productId);
+    if (!findProduct) {
+      throw new Error("Product not found");
+    }
 
-  findProduct.quantity += findOrder.product.quantity;
-  await findProduct.save();
+    findProduct.quantity += orderProduct.quantity;
+    await findProduct.save();
+  }
 
   findOrder.status = "cancelled";
   await findOrder.save();
@@ -271,7 +326,10 @@ export const getOrderById = asyncHandler(async (req, res) => {
 
   let matchCretria = { _id: new mongoose.Types.ObjectId(id) };
   if (role !== "admin") {
-    matchCretria = { user: new mongoose.Types.ObjectId(_id) };
+    matchCretria = {
+      _id: new mongoose.Types.ObjectId(id), // Ensure it matches the order ID
+      user: new mongoose.Types.ObjectId(_id), // Match the user ID as well
+    };
   }
 
   let findOrder = await Order.aggregate([
@@ -279,23 +337,74 @@ export const getOrderById = asyncHandler(async (req, res) => {
       $match: matchCretria,
     },
     {
+      $unwind: "$product", // Flatten the 'product' array so we can lookup each item individually
+    },
+    {
       $lookup: {
-        from: "products",
-        localField: "product.productDetails",
-        foreignField: "_id",
-        as: "product.productDetails",
+        from: "products", // Join with the 'products' collection
+        localField: "product.productId", // Field in the 'order' document referring to the product ID
+        foreignField: "_id", // Field in the 'products' collection to match
+        as: "productDetails", // Add product details to this field
         pipeline: [
           {
             $project: {
+              name: 1, // Include only the fields you need
               image: 1,
-              name: 1,
             },
           },
         ],
       },
     },
     {
-      $unwind: "$product.productDetails",
+      $lookup: {
+        from: "users",
+        localField: "user",
+        foreignField: "_id",
+        as: "user",
+        pipeline: [
+          {
+            $project: {
+              firstName: 1,
+              lastName: 1,
+              email: 1,
+              mobile: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $unwind: "$user",
+    },
+    {
+      $unwind: "$productDetails",
+    },
+    {
+      $addFields: {
+        "product.productDetails": "$productDetails", // Add product details to the product object
+      },
+    },
+    {
+      $project: {
+        productDetails: 0, // Optionally remove the original productDetails field
+      },
+    },
+    {
+      $group: {
+        _id: "$_id", // Group back by order ID to reconstruct the original order object
+        user: { $first: "$user" },
+        product: { $push: "$product" }, // Rebuild the product array with updated product details
+        firstName: { $first: "$firstName" },
+        lastName: { $first: "$lastName" },
+        phoneNumber: { $first: "$phoneNumber" },
+        location: { $first: "$location" },
+        status: { $first: "$status" },
+        paymentMethod: { $first: "$paymentMethod" },
+        paymentStatus: { $first: "$paymentStatus" },
+        totalPrice: { $first: "$totalPrice" },
+        createdAt: { $first: "$createdAt" },
+        updatedAt: { $first: "$updatedAt" },
+      },
     },
   ]);
 
@@ -317,15 +426,18 @@ export const deleteOrder = asyncHandler(async (req, res) => {
     throw new Error("Order not found");
   }
 
-  const deleteOrder = await Order.findByIdAndDelete(id);
+  for (let orderProduct of findOrder.product) {
+    const findProduct = await Product.findById(orderProduct.productId);
 
-  const findProduct = await Product.findById(findOrder.product.productDetails);
-  if (!findProduct) {
-    throw new Error("Product not found");
+    if (!findProduct) {
+      throw new Error("Product not found");
+    }
+
+    findProduct.quantity += orderProduct.quantity;
+    await findProduct.save();
   }
 
-  findProduct.quantity += findOrder.product.quantity;
-  await findProduct.save();
+  const deleteOrder = await Order.findByIdAndDelete(findOrder._id);
 
   res
     .status(200)
