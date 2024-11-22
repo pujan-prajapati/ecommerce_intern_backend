@@ -30,6 +30,7 @@ import wishlistRouter from "./routes/wishlist.routes.js";
 import commentRouter from "./routes/comment.routes.js";
 import contactRouter from "./routes/contact.routes.js";
 import reviewRouter from "./routes/review.routes.js";
+import statsRouter from "./routes/stats.routes.js";
 
 app.use("/api/users", userRouter);
 app.use("/api/products", productRouter);
@@ -40,6 +41,7 @@ app.use("/api/wishlist", wishlistRouter);
 app.use("/api/comment", commentRouter);
 app.use("/api/contact", contactRouter);
 app.use("/api/review", reviewRouter);
+app.use("/api/stats", statsRouter);
 
 //error handler
 import { errorHandler } from "./middlewares/errorHandler.js";

@@ -9,6 +9,7 @@ import {
   deleteFromCloudinary,
 } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { sendEmail } from "../utils/sendMail.js";
 
 //user registration
 export const registerUser = asyncHandler(async (req, res) => {
@@ -192,4 +193,93 @@ export const updateUserStatus = asyncHandler(async (req, res) => {
   } else {
     throw new Error("User Not Found");
   }
+});
+
+//forget password
+export const forgetPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const findUser = await User.findOne({ email });
+  if (!findUser) {
+    throw new Error("Email doesn't exist");
+  }
+
+  const otp = generateOTP();
+  const optExpiry = Date.now() + 5 * 60 * 1000;
+
+  findUser.otp = otp;
+  findUser.otpExpiry = optExpiry;
+  await findUser.save();
+
+  const subject = "Password Reset OTP";
+  const text = `Your OTP for password reset is ${otp}`;
+  const html = `
+  <h1>Password Reset OTP</h1>
+  <p>Your OTP for password reset is <strong>${otp}</strong></p>
+  <p>OTP will expire in 5 minutes</p>
+  `;
+
+  await sendEmail(process.env.EMAIL_ADMIN, findUser.email, subject, text, html);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { user: findUser, otp, optExpiry },
+        "OTP Sent Successfully"
+      )
+    );
+});
+
+const generateOTP = () => {
+  const otp = Math.floor(10000 + Math.random() * 90000);
+  return otp;
+};
+
+//verify otp
+export const verifyOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  const findUser = await User.findOne({ email });
+  if (!findUser) {
+    throw new Error("Email doesn't exist");
+  }
+
+  if (findUser.otp !== otp) {
+    throw new Error("Invalid OTP");
+  }
+
+  if (findUser.otpExpiry < Date.now()) {
+    throw new Error("OTP Expired");
+  }
+
+  findUser.otp = null;
+  findUser.otpExpiry = null;
+  await findUser.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, findUser, "OTP Verified Successfully"));
+});
+
+//change password
+export const changePassowrd = asyncHandler(async (req, res) => {
+  const { email, newPassword, confirmPassword } = req.body;
+
+  const findUser = await User.findOne({ email });
+  if (!findUser) {
+    throw new Error("User not found");
+  }
+
+  if (newPassword !== confirmPassword) {
+    throw new Error("Password doesn't match");
+  }
+
+  findUser.password = newPassword;
+  await findUser.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, findUser, "Password Changed Successfully"));
 });
